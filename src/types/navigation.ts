@@ -1,3 +1,5 @@
+import { DEMO_PREVIOUS_SESSION } from '../data/demoPreviousSession';
+
 export type Screen =
   | 'howItWorks'
   | 'sensorClothing'
@@ -6,7 +8,11 @@ export type Screen =
   | 'workoutSummary'
   | 'tutorial'
   | 'progress'
-  | 'squatProgress';
+  | 'squatProgress'
+  | 'benchPressProgress'
+  | 'deadliftProgress'
+  | 'overheadPressProgress'
+  | 'previousSession';
 
 export type WorkoutPhase = 'idle' | 'countdown' | 'active' | 'complete';
 
@@ -32,6 +38,34 @@ export interface WorkoutSummaryData {
   improvements: string[];
 }
 
+export interface SessionSetRecord {
+  setNumber: number;
+  repsCompleted: number;
+  targetReps: number;
+  averageFormScore: number | null;
+}
+
+export interface RepDetail {
+  setNumber: number;
+  repNumber: number;
+  formScore: number;
+  correct: boolean;
+  note?: string;
+}
+
+export interface PreviousSession {
+  dateISO: string;
+  dateLabel: string;
+  exercise: string;
+  sets: SessionSetRecord[];
+  totalReps: number;
+  averageFormScore: number;
+  endedEarly: boolean;
+  repDetails?: RepDetail[];
+  fatigueInsight?: string;
+  advice?: string[];
+}
+
 export interface WorkoutState {
   exercise: string;
   phase: WorkoutPhase;
@@ -53,6 +87,7 @@ export interface AppState {
   screen: Screen;
   connectivity: ConnectivityState;
   workout: WorkoutState;
+  previousSession: PreviousSession | null;
 }
 
 export type AppAction =
@@ -91,6 +126,7 @@ export const initialState: AppState = {
     earbuds: false,
   },
   workout: { ...DEFAULT_WORKOUT },
+  previousSession: DEMO_PREVIOUS_SESSION,
 };
 
 const ISSUE_TO_TIP: Record<string, string> = {
@@ -144,6 +180,63 @@ function buildSummary(workout: WorkoutState): WorkoutSummaryData {
     setResults: workout.setResults,
     strengths,
     improvements,
+  };
+}
+
+function averageScores(scores: number[]): number {
+  if (scores.length === 0) return 0;
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+export function buildPreviousSession(
+  workout: WorkoutState,
+  endedEarly: boolean,
+): PreviousSession | null {
+  const sets: SessionSetRecord[] = workout.setResults.map((s) => ({
+    setNumber: s.setNumber,
+    repsCompleted: s.repsCompleted,
+    targetReps: workout.targetReps,
+    averageFormScore: s.averageFormScore,
+  }));
+
+  const loggedSetNumbers = new Set(sets.map((s) => s.setNumber));
+
+  if (workout.currentSetRepScores.length > 0 && !loggedSetNumbers.has(workout.currentSet)) {
+    sets.push({
+      setNumber: workout.currentSet,
+      repsCompleted: workout.currentSetRepScores.length,
+      targetReps: workout.targetReps,
+      averageFormScore: averageScores(workout.currentSetRepScores),
+    });
+  }
+
+  if (sets.length === 0) return null;
+
+  const totalReps = sets.reduce((sum, s) => sum + s.repsCompleted, 0);
+  const scoredSets = sets.filter((s) => s.averageFormScore !== null);
+  const averageFormScore =
+    scoredSets.length > 0
+      ? Math.round(
+          scoredSets.reduce((sum, s) => sum + (s.averageFormScore ?? 0), 0) / scoredSets.length,
+        )
+      : workout.formScore;
+
+  const now = new Date();
+
+  return {
+    dateISO: now.toISOString(),
+    dateLabel: now.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+    exercise: workout.exercise,
+    sets: sets.sort((a, b) => a.setNumber - b.setNumber),
+    totalReps,
+    averageFormScore,
+    endedEarly,
   };
 }
 
@@ -297,6 +390,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         screen: 'home',
+        previousSession: DEMO_PREVIOUS_SESSION,
         workout: { ...DEFAULT_WORKOUT },
       };
 

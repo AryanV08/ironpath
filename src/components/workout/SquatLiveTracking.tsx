@@ -9,8 +9,10 @@ import {
   createBaseline,
   createRepTracker,
   getDisplayScore,
+  getKneeBend,
   getPhaseLabel,
   isCalibrated,
+  isUserSquatting,
   updateBaseline,
   updateRepTracker,
   type FormFeedback,
@@ -48,7 +50,7 @@ export function SquatLiveTracking({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FormFeedback>({
-    messages: ['Stand naturally facing the camera'],
+    messages: ['Loading camera…'],
     warnings: [],
     score: 100,
     isGood: false,
@@ -121,7 +123,7 @@ export function SquatLiveTracking({
   }, []);
 
   useEffect(() => {
-    if (loading || paused || error) return;
+    if (loading || error) return;
 
     const detect = async () => {
       const video = videoRef.current;
@@ -142,88 +144,114 @@ export function SquatLiveTracking({
       if (poses[0]) {
         const kps = normalizeKeypoints(poses[0].keypoints);
         const visibleCount = countVisibleKeypoints(kps);
-        const tracker = repTrackerRef.current;
+        let tracker = repTrackerRef.current;
 
-        if (trackingActive) {
-          const rawAngles = computeSquatMetrics(kps, baselineRef.current);
-          if (rawAngles && !isCalibrated(baselineRef.current)) {
-            baselineRef.current = updateBaseline(baselineRef.current, rawAngles, kps);
-            if (isCalibrated(baselineRef.current)) {
-              setCalibrated(true);
-            }
-          }
+        const rawAngles = computeSquatMetrics(kps, baselineRef.current);
+        if (rawAngles && !isCalibrated(baselineRef.current)) {
+          baselineRef.current = updateBaseline(baselineRef.current, rawAngles, kps);
         }
-
-        const angles = computeSquatMetrics(kps, baselineRef.current);
-        const ready = isCalibrated(baselineRef.current) && trackingActive;
-        const form = angles
-          ? analyzeForm(angles, tracker.phase, ready)
-          : {
-              messages: ['Move into frame — hips and knees must be visible'],
-              warnings: [],
-              score: 100,
-              isGood: false,
-              showBadge: false,
-            };
-
-        drawPoseOverlay(ctx, kps, trackingActive ? form.warnings : []);
 
         const cal = isCalibrated(baselineRef.current);
-        setTrackingStatus(
-          !trackingActive
-            ? `Set ${workout.currentSet} — get ready`
-            : cal
-              ? `${visibleCount}/17 keypoints · ${getPhaseLabel(tracker.phase)}`
-              : `Calibrating… ${baselineRef.current.samples}/20 — stand still`,
-        );
-        setPhaseLabel(getPhaseLabel(tracker.phase));
+        if (cal !== calibrated) setCalibrated(cal);
 
-        if (angles && cal && trackingActive && workout.repsRemaining > 0) {
-          const { tracker: nextTracker, repCompleted } = updateRepTracker(
-            tracker,
-            angles,
-            form.score,
-            form.warnings,
-            true,
-          );
-          repTrackerRef.current = nextTracker;
+        const angles = computeSquatMetrics(kps, baselineRef.current);
+        const active = trackingActive && !paused && workout.repsRemaining > 0;
 
-          const score = getDisplayScore(nextTracker, form.score);
-          setDisplayScore(score);
-          setFeedback(form);
+        let form: FormFeedback = {
+          messages: ['Move into frame — show hips & knees'],
+          warnings: [],
+          score: 100,
+          isGood: false,
+          showBadge: false,
+        };
 
-          if (repCompleted) {
-            setLastRepScore(repCompleted.formScore);
+        if (angles && cal) {
+          if (active) {
+            form = analyzeForm(angles, tracker.phase, true, baselineRef.current);
 
-            dispatch({
-              type: 'COMPLETE_REP',
-              payload: {
-                formScore: repCompleted.formScore,
-                warnings: repCompleted.warnings,
-              },
-            });
-          }
+            const { tracker: nextTracker, repCompleted } = updateRepTracker(
+              tracker,
+              angles,
+              form.score,
+              form.warnings,
+              true,
+              baselineRef.current,
+            );
+            tracker = nextTracker;
+            repTrackerRef.current = nextTracker;
 
-          dispatch({
-            type: 'UPDATE_WORKOUT',
-            payload: { formScore: score },
-          });
-        } else {
-          if (!trackingActive) {
-            setFeedback({
-              messages: [`${workout.repsRemaining} reps — waiting for countdown`],
-              warnings: [],
-              score: displayScore,
-              isGood: false,
-              showBadge: false,
-            });
-          } else {
+            form = analyzeForm(
+              angles,
+              nextTracker.phase,
+              true,
+              baselineRef.current,
+            );
+
+            const score = getDisplayScore(nextTracker, form.score);
+            setDisplayScore(score);
             setFeedback(form);
+            setPhaseLabel(getPhaseLabel(nextTracker.phase));
+
+            if (repCompleted) {
+              form = analyzeForm(
+                angles,
+                nextTracker.phase,
+                true,
+                baselineRef.current,
+              );
+              setLastRepScore(repCompleted.formScore);
+              dispatch({
+                type: 'COMPLETE_REP',
+                payload: {
+                  formScore: repCompleted.formScore,
+                  warnings: repCompleted.warnings,
+                },
+              });
+            }
+
+            dispatch({ type: 'UPDATE_WORKOUT', payload: { formScore: score } });
+          } else {
+            form = analyzeForm(angles, tracker.phase, true, baselineRef.current);
+            setPhaseLabel(getPhaseLabel(tracker.phase));
+            if (!showCountdown) {
+              setFeedback({
+                messages: ['Stand tall — squat when set begins'],
+                warnings: [],
+                score: 100,
+                isGood: false,
+                showBadge: false,
+              });
+            } else {
+              setFeedback({
+                messages: [`Get ready — ${workout.repsRemaining} reps`],
+                warnings: [],
+                score: 100,
+                isGood: false,
+                showBadge: false,
+              });
+            }
           }
+
+          const bend = getKneeBend(angles, baselineRef.current);
+          const squatting = isUserSquatting(angles, tracker.phase, baselineRef.current);
+
+          setTrackingStatus(
+            !active
+              ? showCountdown
+                ? `Set ${workout.currentSet} starts in ${countdownValue}…`
+                : `Ready · ${visibleCount}/17 keypoints`
+              : squatting
+                ? `${getPhaseLabel(tracker.phase)} · knee bend ${Math.round(bend)}°`
+                : `Standing · bend ${Math.round(bend)}° to start`,
+          );
+        } else if (!cal) {
+          setTrackingStatus(`Detecting pose… ${visibleCount}/17 visible`);
         }
+
+        drawPoseOverlay(ctx, kps, active ? form.warnings : []);
       } else {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        setTrackingStatus('No pose detected — step back so full body is visible');
+        setTrackingStatus('Step back — full body must be visible');
       }
 
       animRef.current = requestAnimationFrame(detect);
@@ -233,19 +261,20 @@ export function SquatLiveTracking({
     return () => cancelAnimationFrame(animRef.current);
   }, [
     loading,
-    paused,
     error,
+    paused,
     dispatch,
     trackingActive,
+    showCountdown,
+    countdownValue,
     workout.repsRemaining,
     workout.currentSet,
-    displayScore,
+    calibrated,
   ]);
 
-  const scoreClass = displayScore >= 78 ? 'good' : 'bad';
-  const showFormBadge =
-    calibrated && trackingActive && feedback.showBadge && phaseLabel !== 'Standing';
+  const showFormBadge = calibrated && trackingActive && !paused && feedback.showBadge;
   const formBadgeClass = feedback.isGood ? 'form-badge good' : 'form-badge bad';
+  const scoreClass = displayScore >= 75 ? 'good' : 'bad';
 
   return (
     <div className="squat-tracker">
@@ -288,27 +317,17 @@ export function SquatLiveTracking({
           </>
         )}
 
-        {(feedback.warnings.length > 0 || feedback.messages.length > 0) &&
-          !loading &&
-          !error &&
-          trackingActive &&
-          feedback.showBadge && (
+        {showFormBadge && (
           <div className="squat-feedback-overlay">
             {feedback.warnings.map((warn, i) => (
               <div key={`${warn}-${i}`} className="feedback-line">
-                {warn.includes('calibrating') || warn.includes('Hold still') ? (
-                  <span>{warn}</span>
-                ) : (
-                  <>
-                    <span className="warn">!</span>
-                    <span>{warn}</span>
-                    <span>→</span>
-                    <span className="fix">{feedback.messages[i] ?? ''}</span>
-                  </>
-                )}
+                <span className="warn">!</span>
+                <span>{warn}</span>
+                <span>→</span>
+                <span className="fix">{feedback.messages[i] ?? ''}</span>
               </div>
             ))}
-            {!feedback.isGood && feedback.warnings.length === 0 && feedback.messages[0] && (
+            {feedback.warnings.length === 0 && feedback.messages[0] && (
               <div className="feedback-line">
                 <span>{feedback.messages[0]}</span>
               </div>
@@ -325,7 +344,7 @@ export function SquatLiveTracking({
         <div>
           <div className={`stat-value ${scoreClass}`}>
             {displayScore}
-            {displayScore < 78 && <span className="trend-down"> ▼</span>}
+            {displayScore < 75 && <span className="trend-down"> ▼</span>}
             {displayScore >= 90 && <span className="trend-up"> ▲</span>}
           </div>
           <div className="stat-label">FORM SCORE · {phaseLabel.toUpperCase()}</div>

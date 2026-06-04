@@ -1,14 +1,8 @@
 import { useApp } from '../context/AppContext';
 import { ScreenHeader } from '../components/layout/ScreenHeader';
 import { ScreenTitle } from '../components/layout/ScreenTitle';
+import { EXERCISE_LIST, progressScreenForExercise } from '../data/exerciseProgress';
 import './screens.css';
-
-const EXERCISES = [
-  { name: 'BENCH PRESS', weight: 140, form: 92 },
-  { name: 'SQUAT', weight: 190, form: 94 },
-  { name: 'DEADLIFT', weight: 140, form: 88 },
-  { name: 'OVERHEAD PRESS', weight: 80, form: 90 },
-];
 
 export function ProgressScreen() {
   const { navigate } = useApp();
@@ -19,12 +13,12 @@ export function ProgressScreen() {
       <ScreenTitle title="PROGRESS" />
 
       <div className="progress-list">
-        {EXERCISES.map((ex) => (
+        {EXERCISE_LIST.map((ex) => (
           <button
-            key={ex.name}
+            key={ex.id}
             type="button"
             className="progress-card"
-            onClick={() => ex.name === 'SQUAT' && navigate('squatProgress')}
+            onClick={() => navigate(progressScreenForExercise(ex.id))}
           >
             <div>
               <div className="progress-card-name">{ex.name}</div>
