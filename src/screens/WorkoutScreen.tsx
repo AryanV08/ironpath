@@ -31,7 +31,7 @@ export function WorkoutScreen() {
 
       <div className="workout-stage">
         <SquatLiveTracking
-          paused={paused || showCountdown}
+          paused={paused}
           trackingActive={trackingActive}
           setKey={workout.currentSet}
           showCountdown={showCountdown}

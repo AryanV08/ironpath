@@ -1,39 +1,41 @@
 import { useState } from 'react';
 import '../../screens/screens.css';
 
-const DATA = [
-  { week: 'W1', weight: 172 },
-  { week: 'W2', weight: 178 },
-  { week: 'W3', weight: 178 },
-  { week: 'W4', weight: 185 },
-];
-
-const CHART = {
-  left: 50,
-  right: 20,
-  top: 20,
-  bottom: 40,
-  width: 360,
-  height: 200,
-  minY: 170,
-  maxY: 190,
-};
-
-function scaleX(index: number) {
-  const plotW = CHART.width - CHART.left - CHART.right;
-  return CHART.left + (index / (DATA.length - 1)) * plotW;
+export interface ChartPoint {
+  week: string;
+  weight: number;
 }
 
-function scaleY(weight: number) {
-  const plotH = CHART.height - CHART.top - CHART.bottom;
-  const ratio = (weight - CHART.minY) / (CHART.maxY - CHART.minY);
-  return CHART.height - CHART.bottom - ratio * plotH;
+interface WeightProgressChartProps {
+  data: ChartPoint[];
+  minY: number;
+  maxY: number;
 }
 
-export function WeightProgressChart() {
+export function WeightProgressChart({ data, minY, maxY }: WeightProgressChartProps) {
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const points = DATA.map((d, i) => ({
+  const CHART = {
+    left: 50,
+    right: 20,
+    top: 20,
+    bottom: 40,
+    width: 360,
+    height: 200,
+  };
+
+  function scaleX(index: number) {
+    const plotW = CHART.width - CHART.left - CHART.right;
+    return CHART.left + (index / (data.length - 1)) * plotW;
+  }
+
+  function scaleY(weight: number) {
+    const plotH = CHART.height - CHART.top - CHART.bottom;
+    const ratio = (weight - minY) / (maxY - minY);
+    return CHART.height - CHART.bottom - ratio * plotH;
+  }
+
+  const points = data.map((d, i) => ({
     ...d,
     cx: scaleX(i),
     cy: scaleY(d.weight),
@@ -41,7 +43,7 @@ export function WeightProgressChart() {
 
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.cx} ${p.cy}`).join(' ');
 
-  const yTicks = [170, 180, 190];
+  const yTicks = [minY, Math.round((minY + maxY) / 2), maxY];
 
   return (
     <div className="progress-chart-wrap glass-card">
@@ -49,7 +51,7 @@ export function WeightProgressChart() {
         viewBox={`0 0 ${CHART.width} ${CHART.height}`}
         className="progress-chart"
         role="img"
-        aria-label="Weight progress chart from W1 to W4"
+        aria-label="Weight progress chart"
       >
         {yTicks.map((tick) => (
           <g key={tick}>
@@ -66,7 +68,7 @@ export function WeightProgressChart() {
           </g>
         ))}
 
-        {DATA.map((d, i) => (
+        {data.map((d, i) => (
           <text
             key={d.week}
             className="chart-axis-label"

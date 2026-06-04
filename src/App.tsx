@@ -7,8 +7,10 @@ import { WorkoutScreen } from './screens/WorkoutScreen';
 import { TutorialScreen } from './screens/TutorialScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { SquatProgressScreen } from './screens/SquatProgressScreen';
+import { ExerciseProgressScreen } from './screens/ExerciseProgressScreen';
 import { SensorClothingScreen } from './screens/SensorClothingScreen';
 import { WorkoutSummaryScreen } from './screens/WorkoutSummaryScreen';
+import { PreviousSessionScreen } from './screens/PreviousSessionScreen';
 
 function ScreenRouter() {
   const { state } = useApp();
@@ -30,6 +32,14 @@ function ScreenRouter() {
       return <ProgressScreen />;
     case 'squatProgress':
       return <SquatProgressScreen />;
+    case 'benchPressProgress':
+      return <ExerciseProgressScreen exerciseId="benchPress" />;
+    case 'deadliftProgress':
+      return <ExerciseProgressScreen exerciseId="deadlift" />;
+    case 'overheadPressProgress':
+      return <ExerciseProgressScreen exerciseId="overheadPress" />;
+    case 'previousSession':
+      return <PreviousSessionScreen />;
     default:
       return <HowItWorksScreen />;
   }

@@ -49,23 +49,17 @@ export interface RepCompletionEvent {
   warnings: string[];
 }
 
-const MIN_KEYPOINT_SCORE = 0.2;
-const CALIBRATION_FRAMES = 20;
+const MIN_KEYPOINT_SCORE = 0.12;
+export const CALIBRATION_FRAMES = 1;
 
-/** Thresholds tuned for front-facing webcam (more lenient than side view) */
 const TH = {
-  standKneeMin: 148,
-  standHipDropMax: 0.1,
-  descendKneeMax: 142,
-  descendHipDropMin: 0.06,
-  bottomKneeMax: 135,
-  bottomHipDropMin: 0.16,
-  ascendKneeMin: 128,
-  // Form (only scored during bottom / ascending)
-  depthHipDropGood: 0.2,
-  depthKneeGood: 138,
-  valgusMax: 0.22,
-  leanMax: 28,
+  kneeBendMin: 18,
+  kneeDeep: 138,
+  kneeShallow: 152,
+  hipDropSquat: 0.05,
+  hipDropDeep: 0.1,
+  valgusMax: 0.18,
+  leanMax: 35,
 };
 
 export function createBaseline(): SquatBaseline {
@@ -124,22 +118,18 @@ export function computeSquatMetrics(
 
   if (!lHip || !rHip || !lKnee || !rKnee || !lAnkle || !rAnkle) return null;
 
-  const leftKnee = angleBetween(lHip, lKnee, lAnkle);
-  const rightKnee = angleBetween(rHip, rKnee, rAnkle);
-  const knee = (leftKnee + rightKnee) / 2;
+  const knee = (angleBetween(lHip, lKnee, lAnkle) + angleBetween(rHip, rKnee, rAnkle)) / 2;
 
   const midHip = midpoint(lHip, rHip);
   const midAnkle = midpoint(lAnkle, rAnkle);
   const hipAnkleSpan = Math.max(midAnkle.y - midHip.y, 1);
 
-  const hipDrop =
-    baseline?.samples && baseline.hipAnkleSpan > 0
-      ? Math.max(0, (midHip.y - baseline.hipY) / baseline.hipAnkleSpan)
-      : 0;
+  const refHipY = baseline?.samples ? baseline.hipY : midHip.y;
+  const refSpan = baseline?.samples ? baseline.hipAnkleSpan : hipAnkleSpan;
+  const hipDrop = Math.max(0, (midHip.y - refHipY) / Math.max(refSpan, 1));
 
   const kneeWidth = distance(lKnee, rKnee);
   const ankleWidth = Math.max(distance(lAnkle, rAnkle), 1);
-  const kneeSpread = kneeWidth / ankleWidth;
 
   let torsoLean = 0;
   if (lShoulder && rShoulder) {
@@ -149,18 +139,13 @@ export function computeSquatMetrics(
     );
   }
 
-  const hip =
-    lShoulder && rShoulder
-      ? angleBetween(midpoint(lShoulder, rShoulder), midHip, midpoint(lKnee, rKnee))
-      : (angleBetween(lHip, lKnee, lAnkle) + angleBetween(rHip, rKnee, rAnkle)) / 2;
-
   return {
     knee,
-    hip,
+    hip: knee,
     torsoLean,
     depth: 180 - knee,
     hipDrop,
-    kneeSpread,
+    kneeSpread: kneeWidth / ankleWidth,
   };
 }
 
@@ -169,39 +154,37 @@ export function updateBaseline(
   angles: SquatAngles,
   keypoints: { name?: string; x: number; y: number; score?: number }[],
 ): SquatBaseline {
-  if (angles.knee > TH.standKneeMin && angles.hipDrop < TH.standHipDropMax) {
-    const lHip = getKeypoint(keypoints, 'left_hip');
-    const rHip = getKeypoint(keypoints, 'right_hip');
-    const lShoulder = getKeypoint(keypoints, 'left_shoulder');
-    const rShoulder = getKeypoint(keypoints, 'right_shoulder');
-    const lKnee = getKeypoint(keypoints, 'left_knee');
-    const rKnee = getKeypoint(keypoints, 'right_knee');
-    const lAnkle = getKeypoint(keypoints, 'left_ankle');
-    const rAnkle = getKeypoint(keypoints, 'right_ankle');
+  const lHip = getKeypoint(keypoints, 'left_hip');
+  const rHip = getKeypoint(keypoints, 'right_hip');
+  const lShoulder = getKeypoint(keypoints, 'left_shoulder');
+  const rShoulder = getKeypoint(keypoints, 'right_shoulder');
+  const lKnee = getKeypoint(keypoints, 'left_knee');
+  const rKnee = getKeypoint(keypoints, 'right_knee');
+  const lAnkle = getKeypoint(keypoints, 'left_ankle');
+  const rAnkle = getKeypoint(keypoints, 'right_ankle');
 
-    if (lHip && rHip && lShoulder && rShoulder && lKnee && rKnee && lAnkle && rAnkle) {
-      const midHip = midpoint(lHip, rHip);
-      const midShoulder = midpoint(lShoulder, rShoulder);
-      const n = baseline.samples + 1;
+  if (!lHip || !rHip || !lKnee || !rKnee || !lAnkle || !rAnkle) return baseline;
 
-      return {
-        hipY: (baseline.hipY * baseline.samples + midHip.y) / n,
-        kneeAngle: (baseline.kneeAngle * baseline.samples + angles.knee) / n,
-        torsoLength:
-          (baseline.torsoLength * baseline.samples + distance(midShoulder, midHip)) / n,
-        ankleWidth:
-          (baseline.ankleWidth * baseline.samples + distance(lAnkle, rAnkle)) / n,
-        kneeWidth: (baseline.kneeWidth * baseline.samples + distance(lKnee, rKnee)) / n,
-        hipAnkleSpan:
-          (baseline.hipAnkleSpan * baseline.samples +
-            Math.max(midpoint(lAnkle, rAnkle).y - midHip.y, 1)) /
-          n,
-        samples: n,
-      };
-    }
-  }
+  const midHip = midpoint(lHip, rHip);
+  const midShoulder =
+    lShoulder && rShoulder ? midpoint(lShoulder, rShoulder) : midHip;
 
-  return baseline;
+  const n = baseline.samples + 1;
+  const newKnee = (baseline.kneeAngle * baseline.samples + angles.knee) / n;
+
+  return {
+    hipY: (baseline.hipY * baseline.samples + midHip.y) / n,
+    kneeAngle: Math.max(newKnee, angles.knee),
+    torsoLength:
+      (baseline.torsoLength * baseline.samples + distance(midShoulder, midHip)) / n,
+    ankleWidth: (baseline.ankleWidth * baseline.samples + distance(lAnkle, rAnkle)) / n,
+    kneeWidth: (baseline.kneeWidth * baseline.samples + distance(lKnee, rKnee)) / n,
+    hipAnkleSpan:
+      (baseline.hipAnkleSpan * baseline.samples +
+        Math.max(midpoint(lAnkle, rAnkle).y - midHip.y, 1)) /
+      n,
+    samples: Math.max(n, CALIBRATION_FRAMES),
+  };
 }
 
 export function isCalibrated(baseline: SquatBaseline): boolean {
@@ -212,35 +195,43 @@ function isActiveSquatPhase(phase: SquatPhase): boolean {
   return phase === 'descending' || phase === 'bottom' || phase === 'ascending';
 }
 
+/** Knee bent relative to calibrated standing angle */
+export function getKneeBend(angles: SquatAngles, baseline: SquatBaseline | null): number {
+  if (!baseline?.samples) return 0;
+  return baseline.kneeAngle - angles.knee;
+}
+
+export function isUserSquatting(
+  angles: SquatAngles,
+  phase: SquatPhase,
+  baseline: SquatBaseline | null,
+): boolean {
+  if (isActiveSquatPhase(phase)) return true;
+  if (!baseline?.samples) return angles.knee < 155;
+  const bend = getKneeBend(angles, baseline);
+  return bend >= TH.kneeBendMin || angles.hipDrop >= TH.hipDropSquat;
+}
+
 export function analyzeForm(
   angles: SquatAngles,
   phase: SquatPhase,
   calibrated: boolean,
+  baseline?: SquatBaseline | null,
 ): FormFeedback {
   if (!calibrated) {
     return {
-      warnings: ['Hold still — calibrating…'],
-      messages: ['Stand naturally facing the camera'],
+      warnings: [],
+      messages: ['Detecting pose…'],
       score: 100,
       isGood: false,
       showBadge: false,
     };
   }
 
-  if (phase === 'standing') {
+  if (!isUserSquatting(angles, phase, baseline ?? null)) {
     return {
       warnings: [],
-      messages: ['Ready — squat when set is active'],
-      score: 100,
-      isGood: false,
-      showBadge: false,
-    };
-  }
-
-  if (!isActiveSquatPhase(phase)) {
-    return {
-      warnings: [],
-      messages: [],
+      messages: ['Squat down — form check starts as you descend'],
       score: 100,
       isGood: false,
       showBadge: false,
@@ -249,40 +240,48 @@ export function analyzeForm(
 
   const warnings: string[] = [];
   const messages: string[] = [];
-  let score = 100;
+  let score = 92;
 
-  // Only apply strict checks near/at the bottom of the movement
-  const scoreForm = phase === 'bottom' || (phase === 'ascending' && angles.hipDrop > 0.12);
+  const kneeBend = getKneeBend(angles, baseline ?? null);
+  const deepEnough =
+    angles.knee <= TH.kneeDeep ||
+    kneeBend >= 35 ||
+    angles.hipDrop >= TH.hipDropDeep ||
+    phase === 'bottom';
 
-  if (!scoreForm) {
+  const shallow =
+    angles.knee > TH.kneeShallow && kneeBend < 22 && angles.hipDrop < TH.hipDropDeep;
+
+  if (shallow) {
     return {
-      warnings: [],
-      messages: ['Keep going down…'],
-      score: 100,
+      warnings: ['Insufficient depth'],
+      messages: ['Sit lower'],
+      score: 68,
       isGood: false,
       showBadge: true,
     };
   }
 
-  const depthOk =
-    angles.hipDrop >= TH.depthHipDropGood || angles.knee <= TH.depthKneeGood;
-
-  if (!depthOk) {
-    warnings.push('Insufficient depth');
-    messages.push('Sit lower');
-    score -= 15;
+  if (!deepEnough && (phase === 'descending' || phase === 'ascending')) {
+    return {
+      warnings: [],
+      messages: ['Keep going down…'],
+      score: 85,
+      isGood: false,
+      showBadge: true,
+    };
   }
 
   if (angles.kneeSpread < 1 - TH.valgusMax) {
     warnings.push('Knees caving inward');
     messages.push('Push knees out');
-    score -= 12;
+    score -= 14;
   }
 
-  if (angles.torsoLean > TH.leanMax && angles.hipDrop > 0.14) {
+  if (angles.torsoLean > TH.leanMax && deepEnough) {
     warnings.push('Forward lean');
     messages.push('Chest up');
-    score -= 10;
+    score -= 12;
   }
 
   score = Math.max(0, Math.min(100, score));
@@ -291,7 +290,7 @@ export function analyzeForm(
     messages,
     warnings: [...new Set(warnings)],
     score,
-    isGood: score >= 78 && warnings.length === 0,
+    isGood: score >= 75 && warnings.length === 0,
     showBadge: true,
   };
 }
@@ -318,22 +317,29 @@ function unique(items: string[]): string[] {
   return [...new Set(items)];
 }
 
-function isAtBottom(angles: SquatAngles): boolean {
+function isAtBottom(angles: SquatAngles, baseline: SquatBaseline | null): boolean {
+  const bend = getKneeBend(angles, baseline);
   return (
-    angles.knee <= TH.bottomKneeMax ||
-    angles.hipDrop >= TH.bottomHipDropMin
+    angles.knee <= TH.kneeDeep ||
+    bend >= 28 ||
+    angles.hipDrop >= TH.hipDropDeep
   );
 }
 
-function isAtTop(angles: SquatAngles): boolean {
-  return angles.knee >= TH.standKneeMin && angles.hipDrop <= TH.standHipDropMax;
+function isAtTop(angles: SquatAngles, baseline: SquatBaseline | null): boolean {
+  if (!baseline?.samples) return angles.knee >= 155;
+  const bend = getKneeBend(angles, baseline);
+  return bend < 12 && angles.hipDrop <= TH.hipDropSquat;
 }
 
-function isDescending(angles: SquatAngles, phase: SquatPhase): boolean {
-  return (
-    phase === 'standing' &&
-    (angles.knee <= TH.descendKneeMax || angles.hipDrop >= TH.descendHipDropMin)
-  );
+function isDescending(
+  angles: SquatAngles,
+  phase: SquatPhase,
+  baseline: SquatBaseline | null,
+): boolean {
+  if (phase !== 'standing') return false;
+  if (!baseline?.samples) return angles.knee < 155;
+  return getKneeBend(angles, baseline) >= 10 || angles.hipDrop >= 0.04;
 }
 
 export function updateRepTracker(
@@ -342,6 +348,7 @@ export function updateRepTracker(
   frameScore: number,
   frameWarnings: string[],
   calibrated: boolean,
+  baseline: SquatBaseline | null,
 ): { tracker: RepTrackerState; repCompleted: RepCompletionEvent | null } {
   if (!calibrated) return { tracker, repCompleted: null };
 
@@ -355,7 +362,7 @@ export function updateRepTracker(
   let depthReached = tracker.depthReached;
   let repCompleted: RepCompletionEvent | null = null;
 
-  if (isAtTop(angles)) {
+  if (isAtTop(angles, baseline)) {
     if ((phase === 'ascending' || phase === 'bottom') && depthReached) {
       const formScore = average(next.currentRepScores);
       const warnings = unique(next.currentRepWarnings);
@@ -367,11 +374,11 @@ export function updateRepTracker(
       depthReached = false;
     }
     phase = 'standing';
-  } else if (phase === 'bottom' && angles.knee >= TH.ascendKneeMin) {
+  } else if (phase === 'bottom' && getKneeBend(angles, baseline) < 15) {
     phase = 'ascending';
     next.currentRepScores.push(frameScore);
     next.currentRepWarnings.push(...frameWarnings);
-  } else if (isAtBottom(angles)) {
+  } else if (isAtBottom(angles, baseline)) {
     phase = 'bottom';
     depthReached = true;
     next.currentRepScores.push(frameScore);
@@ -379,7 +386,7 @@ export function updateRepTracker(
   } else if (phase === 'ascending') {
     next.currentRepScores.push(frameScore);
     next.currentRepWarnings.push(...frameWarnings);
-  } else if (isDescending(angles, phase)) {
+  } else if (isDescending(angles, phase, baseline)) {
     phase = 'descending';
   }
 
