@@ -1,13 +1,10 @@
 import { useApp } from '../context/AppContext';
 import { ScreenHeader } from '../components/layout/ScreenHeader';
 import { ScreenTitle } from '../components/layout/ScreenTitle';
+import ironPathShirt from '../components/layout/Iron_Path_Shirt-removebg.png';
+import smartMirror from '../components/layout/mirror.png';
+import ironPathEarbuds from '../components/layout/earbuds.png';
 import './screens.css';
-
-const ASSETS = {
-  shirt: '/assets/sensor-shirt.svg',
-  mirror: '/assets/smart-mirror.svg',
-  earbuds: '/assets/earbuds.svg',
-};
 
 export function HowItWorksScreen() {
   const { navigate } = useApp();
@@ -19,8 +16,8 @@ export function HowItWorksScreen() {
 
       <div className="how-cards">
         <div className="how-card">
-          <div className="how-card-image-wrap">
-            <img src={ASSETS.shirt} alt="Sensor clothing" className="how-card-image" />
+          <div className="how-card-image-wrap shirt">
+            <img src={ironPathShirt} alt="IronPath sensor shirt" className="how-card-image" />
           </div>
           <div className="how-card-title">SENSOR CLOTHING</div>
           <div className="how-card-desc">Tracks movement, posture, and muscle activity.</div>
@@ -33,15 +30,15 @@ export function HowItWorksScreen() {
           </button>
         </div>
         <div className="how-card">
-          <div className="how-card-image-wrap">
-            <img src={ASSETS.mirror} alt="Smart mirror" className="how-card-image" />
+          <div className="how-card-image-wrap mirror">
+            <img src={smartMirror} alt="IronPath smart mirror" className="how-card-image" />
           </div>
           <div className="how-card-title">SMART MIRROR</div>
           <div className="how-card-desc">Shows feedback, progress, recommendations and controls.</div>
         </div>
         <div className="how-card">
-          <div className="how-card-image-wrap">
-            <img src={ASSETS.earbuds} alt="Earbuds" className="how-card-image" />
+          <div className="how-card-image-wrap earbuds">
+            <img src={ironPathEarbuds} alt="IronPath earbuds" className="how-card-image" />
           </div>
           <div className="how-card-title">EARBUDS</div>
           <div className="how-card-desc">Gives simple safety beeps during workouts.</div>

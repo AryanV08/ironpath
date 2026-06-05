@@ -181,12 +181,31 @@
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
+.how-card-image-wrap.shirt {
+  height: 110px;
+  background: transparent;
+}
+
+.how-card-image-wrap.shirt .how-card-image {
+  max-height: 100px;
+}
+
 .how-card-image-wrap.mirror {
-  height: 100px;
+  height: 156px;
+  background: transparent;
 }
 
 .how-card-image-wrap.mirror .how-card-image {
-  max-height: 96px;
+  max-height: 152px;
+}
+
+.how-card-image-wrap.earbuds {
+  height: 110px;
+  background: transparent;
+}
+
+.how-card-image-wrap.earbuds .how-card-image {
+  max-height: 106px;
 }
 
 .how-card-title {
