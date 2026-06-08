@@ -1,11 +1,15 @@
+import logoImage from './logo.png';
+
 export function IronPathLogo() {
   return (
     <div className="logo-wrap">
-      <div className="logo-mark" aria-label="IronPath">
-        <span className="logo-i" />
-        <span className="logo-p" />
+      <div className="logo-emblem-wrap" aria-hidden="true">
+        <img src={logoImage} alt="" className="logo-emblem-crop" />
       </div>
-      <span className="logo-word">IronPath</span>
+      <p className="logo-wordmark" aria-label="IronPath">
+        <span className="logo-iron">Iron </span>
+        <span className="logo-path">Path</span>
+      </p>
     </div>
   );
 }

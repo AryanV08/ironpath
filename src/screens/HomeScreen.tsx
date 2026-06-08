@@ -15,7 +15,7 @@ export function HomeScreen() {
 
   return (
     <>
-      <ScreenHeader showBack={false} />
+      <ScreenHeader showBack={false} onHelpClick={() => navigate('howItWorks')} />
       <ScreenTitle title="HOME" />
 
       <div className="home-actions">

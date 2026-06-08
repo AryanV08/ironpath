@@ -10,6 +10,9 @@
   --glass-strong: rgba(40, 40, 40, 0.72);
   --shadow-red: 0 4px 24px rgba(204, 0, 0, 0.35);
   --font: 'Poppins', system-ui, sans-serif;
+  --logo-surface: #c8c8c8;
+  --logo-surface-top: #dedede;
+  --logo-iron-text: #111111;
 }
 
 *,
@@ -106,6 +109,28 @@ a {
   height: 14px;
 }
 
+.screen-header-spacer {
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.nav-help {
+  width: 72px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.95;
+  transition: opacity 0.2s;
+}
+
+.nav-help:hover {
+  opacity: 1;
+}
+
 .screen-time {
   font-size: 0.85rem;
   font-weight: 500;
@@ -116,55 +141,53 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.7rem 0.4rem;
+  border-radius: 10px;
+  background:
+    linear-gradient(165deg, var(--logo-surface-top) 0%, var(--logo-surface) 55%, #b8b8b8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-bottom: 2px solid var(--red);
+  box-shadow:
+    0 3px 18px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
-.logo-mark {
-  position: relative;
-  width: 52px;
-  height: 36px;
+.logo-emblem-wrap {
+  height: 28px;
+  overflow: hidden;
+  line-height: 0;
 }
 
-.logo-i {
-  position: absolute;
-  left: 4px;
-  top: 2px;
-  width: 8px;
-  height: 30px;
-  background: var(--red);
-  border-radius: 1px;
-  transform: skewX(-12deg);
+.logo-emblem-crop {
+  display: block;
+  height: 46px;
+  width: auto;
+  max-width: 108px;
+  object-fit: contain;
+  object-position: top center;
+  filter: brightness(1.12) contrast(1.05);
+  pointer-events: none;
 }
 
-.logo-p {
-  position: absolute;
-  left: 14px;
-  top: 2px;
-  width: 28px;
-  height: 30px;
-  border: 7px solid var(--charcoal-light);
-  border-right: none;
-  border-radius: 14px 0 0 14px;
-  transform: skewX(-12deg);
-  box-shadow: inset -2px 0 0 rgba(255, 255, 255, 0.08);
+.logo-wordmark {
+  font-family: var(--font);
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin: 0;
+  white-space: nowrap;
 }
 
-.logo-p::after {
-  content: '';
-  position: absolute;
-  right: -7px;
-  top: 50%;
-  width: 14px;
-  height: 7px;
-  background: var(--charcoal-light);
-  transform: translateY(-50%);
+.logo-iron {
+  color: var(--logo-iron-text);
 }
 
-.logo-word {
-  font-size: 0.55rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.85);
+.logo-path {
+  color: var(--red);
 }
 
 .screen-title-block {
